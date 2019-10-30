@@ -1,0 +1,147 @@
+---
+title: "index"
+author: "John Higdon"
+date: "10/24/2019"
+output: html_document
+---
+
+```{r}
+library("tidyverse")
+library("rvest")
+library("tidyr")
+```
+
+First off, let's load the website we want to perform web scraping on.
+
+```{r}
+url <- "http://ems.csuchico.edu/APSS/schedule/spr2019/CSCI.shtml"
+scrape_html <- read_html(url)
+```
+
+Now we need to ask ourselves what information we would like to glean.
+
+It may be interesting to determine all the classes which do not have any available seats to get a better picture of what kind of classes we can register for.
+
+Let's determine the fields that are useful to us.
+
+1) Subject
+2) Category number (Cat num)
+3) Section
+4) Title
+5) Units
+6) Instructor
+7) Seats available
+8) Total enrolled
+
+We can grab this information and then form a table to generate a report for further analysis.
+
+```{r}
+schedule <- scrape_html %>% html_nodes(".classrow")
+
+subject <- schedule %>% 
+           html_nodes(".subj") %>% 
+           html_text()
+
+category <- schedule %>%
+            html_nodes(".cat_num") %>%
+            html_text()
+
+title <- schedule %>%
+         html_nodes(".title") %>%
+         html_text()
+
+unit <- schedule %>%
+        html_nodes(".units") %>%
+        html_text()
+
+instructor <- schedule %>%
+              html_nodes(".Instructor") %>%
+              html_text()
+
+seats <- schedule %>%
+         html_nodes(".seatsavail") %>%
+         html_text()
+
+total <- schedule %>%
+         html_nodes(".enrtot") %>%
+         html_text()
+
+report <- tibble(subject = subject, category = category, title = title, unit = unit, instructor = instructor, seats = seats, total = total)
+
+```
+
+Now let's look at the amount of classes each professor taught during the Spring 2019 semester.
+
+```{r}
+graph <- ggplot(report, aes(x = instructor, fill = instructor)) + geom_bar() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+graph
+```
+
+We were asked on 10/29/19 to create a function named "read_class_schedule" which has a parameter called url that receives the location of the schedule and completes the actions of the previous steps, then returns a tibble with information scraped.
+
+```{r}
+read_class_schedule <- function(url) {
+  scrape_html <- read_html(url)
+  schedule <- scrape_html %>% html_nodes(".classrow, .classrowalt")
+  
+  subject <- schedule %>% 
+             html_nodes(".subj") %>% 
+             html_text()
+  
+  category <- schedule %>%
+              html_nodes(".cat_num") %>%
+              html_text()
+  
+  title <- schedule %>%
+           html_nodes(".title") %>%
+           html_text()
+  
+  unit <- schedule %>%
+          html_nodes(".units") %>%
+          html_text()
+  
+  instructor <- schedule %>%
+                html_nodes(".Instructor") %>%
+                html_text()
+  
+  seats <- schedule %>%
+           html_nodes(".seatsavail") %>%
+           html_text()
+  
+  total <- schedule %>%
+           html_nodes(".enrtot") %>%
+           html_text()
+  
+  
+  report <- tibble(subject = subject, category = category, title = title, unit = unit, instructor = instructor, seats = seats,                  total = total)
+  
+  return(report)
+}
+```
+
+Now we can use the function specified above to grab schedules for the Math 2020, Math 2019, CSCI 2020 and CSCI 2019 class schedules.
+
+```{r}
+# use our new function to generate tables for Math and CSCI 2019/2020 schedules.
+Math2020 <- read_class_schedule("http://ems.csuchico.edu/APSS/schedule/spr2020/MATH.shtml")
+Math2019 <- read_class_schedule("http://ems.csuchico.edu/APSS/schedule/spr2019/MATH.shtml")
+CSCI2020 <- read_class_schedule("http://ems.csuchico.edu/APSS/schedule/spr2020/CSCI.shtml")
+CSCI2019 <- read_class_schedule("http://ems.csuchico.edu/APSS/schedule/spr2019/CSCI.shtml")
+```
+
+We will now join the previous four datasets into one large table. To do this, first we join the two CSCI schedules, then we join the two Math schedules. Finally, we join the two new tables together to reach our final table which observes the schedules from 2019-2020 for both CSCI and Math.
+
+```{r}
+# join both Math tibbles
+math_tibble <- dplyr::full_join(Math2020, Math2019, copy = FALSE)
+
+# join both CSCI tibbles
+csci_tibble <- dplyr::full_join(CSCI2020, CSCI2019, copy = FALSE)
+
+# join the Math and CSCI tibbles
+csci_and_math_tibble <- dplyr::full_join(math_tibble, csci_tibble, copy = FALSE)
+
+# print out the results
+csci_and_math_tibble
+```
+
